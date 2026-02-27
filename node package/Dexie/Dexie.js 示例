@@ -1,0 +1,743 @@
+---
+package_name: Dexie.js
+language: JavaScript
+url: https://github.com/dexie/Dexie.js/
+source: z.ai(glm-5)
+---
+
+我将为您提供一个完整的、可运行的 Dexie.js 示例，涵盖从安装到高级功能的全流程。这个示例将构建一个“朋友管理”应用，充分展示 Dexie.js 的核心能力。
+
+## 📦 一、环境准备与安装
+
+Dexie.js 是一个轻量级的 IndexedDB 封装库，它将复杂的 IndexedDB API 简化为简洁的 Promise-based API【turn0search7】。
+
+### 安装方式
+
+您可以通过以下两种方式之一安装 Dexie.js：
+
+**方式一：通过 npm 安装**
+```bash
+npm install dexie
+```
+
+**方式二：通过 CDN 直接引入**
+```html
+<!-- 在 HTML 文件中直接引入 -->
+<script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+```
+
+## 🗄️ 二、数据库初始化与表结构定义
+
+创建数据库实例并定义表结构是使用 Dexie.js 的第一步。
+
+```javascript
+// 导入 Dexie（ES6 模块方式）
+import Dexie from 'dexie';
+
+// 创建数据库实例
+const db = new Dexie('FriendDatabase');
+
+// 定义数据库版本和表结构
+db.version(1).stores({
+  // friends 表：++id 表示自增主键，name 和 age 是索引字段
+  friends: '++id, name, age, email, *tags',
+  // gameSessions 表：id 是主键，score 是索引字段
+  gameSessions: 'id, score, playedAt'
+});
+
+// 打开数据库
+db.open().then(() => {
+  console.log('数据库打开成功');
+}).catch(err => {
+  console.error('数据库打开失败:', err);
+});
+```
+
+**关键概念说明**：
+- `++id`: 自增主键【turn0search0】
+- `*tags`: 多值索引，适合数组字段【turn0search23】
+- `[name+age]`: 复合索引，用于多字段组合查询【turn0search0】
+
+## ✏️ 三、基础 CRUD 操作
+
+### 1. 创建（Create）
+
+```javascript
+// 单条添加
+async function addFriend() {
+  try {
+    const id = await db.friends.add({
+      name: '张三',
+      age: 25,
+      email: 'zhangsan@example.com',
+      tags: ['前端', '开发']
+    });
+    console.log(`添加成功，ID: ${id}`);
+  } catch (error) {
+    console.error('添加失败:', error);
+  }
+}
+
+// 批量添加
+async function bulkAddFriends() {
+  const friends = [
+    { name: '李四', age: 30, email: 'lisi@example.com', tags: ['后端'] },
+    { name: '王五', age: 28, email: 'wangwu@example.com', tags: ['全栈'] }
+  ];
+  
+  try {
+    const lastId = await db.friends.bulkAdd(friends);
+    console.log('批量添加成功，最后一条 ID:', lastId);
+  } catch (error) {
+    console.error('批量添加失败:', error);
+  }
+}
+```
+
+### 2. 读取（Read）
+
+```javascript
+// 获取所有朋友
+async function getAllFriends() {
+  const allFriends = await db.friends.toArray();
+  console.log('所有朋友:', allFriends);
+  return allFriends;
+}
+
+// 按主键获取单个朋友
+async function getFriendById(id) {
+  const friend = await db.friends.get(id);
+  console.log(`ID 为 ${id} 的朋友:`, friend);
+  return friend;
+}
+
+// 按条件查询
+async function getYoungFriends() {
+  // 查询年龄小于 30 的朋友
+  const youngFriends = await db.friends
+    .where('age')
+    .below(30)
+    .toArray();
+  console.log('年龄小于 30 的朋友:', youngFriends);
+  return youngFriends;
+}
+```
+
+### 3. 更新（Update）
+
+```javascript
+// 更新单个记录
+async function updateFriendAge(id, newAge) {
+  try {
+    const updated = await db.friends.update(id, { age: newAge });
+    if (updated) {
+      console.log(`ID ${id} 更新成功`);
+    } else {
+      console.log(`未找到 ID ${id} 的记录`);
+    }
+  } catch (error) {
+    console.error('更新失败:', error);
+  }
+}
+
+// 批量修改
+async function bulkUpdateFriends() {
+  // 将所有年龄小于 25 岁的朋友标记为"青年"
+  await db.friends
+    .where('age')
+    .below(25)
+    .modify(friend => {
+      friend.category = '青年';
+    });
+  console.log('批量更新完成');
+}
+```
+
+### 4. 删除（Delete）
+
+```javascript
+// 删除单个记录
+async function deleteFriend(id) {
+  try {
+    await db.friends.delete(id);
+    console.log(`ID ${id} 删除成功`);
+  } catch (error) {
+    console.error('删除失败:', error);
+  }
+}
+
+// 批量删除
+async function bulkDeleteFriends() {
+  // 删除所有年龄大于 60 的朋友
+  await db.friends
+    .where('age')
+    .above(60)
+    .delete();
+  console.log('批量删除完成');
+}
+
+// 清空整个表
+async function clearAllFriends() {
+  await db.friends.clear();
+  console.log('friends 表已清空');
+}
+```
+
+## 🔍 四、高级查询功能
+
+Dexie.js 提供了强大的查询能力，类似 SQL 但语法更简洁【turn0search1】。
+
+### 范围查询
+
+```javascript
+// 查询年龄在 25 到 35 之间的朋友
+async function getFriendsInAgeRange() {
+  const friends = await db.friends
+    .where('age')
+    .between(25, 35, true, true) // 包含边界值
+    .toArray();
+  console.log('年龄在 25-35 之间的朋友:', friends);
+  return friends;
+}
+```
+
+### 多条件查询
+
+```javascript
+// 查询年龄大于 25 且标签包含"前端"的朋友
+async function getFrontendDevelopers() {
+  const developers = await db.friends
+    .where('age')
+    .above(25)
+    .and(friend => friend.tags && friend.tags.includes('前端'))
+    .toArray();
+  console.log('前端开发人员:', developers);
+  return developers;
+}
+```
+
+### 使用复合索引
+
+```javascript
+// 如果经常按姓名和年龄组合查询，可以定义复合索引
+db.version(2).stores({
+  friends: '++id, name, age, email, *tags, [name+age]'
+});
+
+// 使用复合索引查询
+async function getFriendByNameAndAge(name, age) {
+  const friend = await db.friends
+    .where('[name+age]')
+    .equals([name, age])
+    .first();
+  console.log('复合索引查询结果:', friend);
+  return friend;
+}
+```
+
+### 排序与分页
+
+```javascript
+// 按年龄降序排序，并分页显示
+async function getFriendsByPage(page = 1, pageSize = 10) {
+  const friends = await db.friends
+    .orderBy('age')
+    .reverse()
+    .offset((page - 1) * pageSize)
+    .limit(pageSize)
+    .toArray();
+  console.log(`第 ${page} 页的朋友:`, friends);
+  return friends;
+}
+```
+
+## 🔄 五、事务处理
+
+事务确保多个数据库操作的原子性，要么全部成功，要么全部失败【turn0search4】。
+
+```javascript
+// 使用事务添加朋友和游戏记录
+async function addFriendWithGameSession(friendData, gameData) {
+  try {
+    await db.transaction('rw', [db.friends, db.gameSessions], async () => {
+      // 添加朋友
+      const friendId = await db.friends.add(friendData);
+      
+      // 添加游戏记录
+      await db.gameSessions.add({
+        ...gameData,
+        friendId: friendId,
+        playedAt: new Date()
+      });
+      
+      console.log('事务成功：朋友和游戏记录已添加');
+    });
+  } catch (error) {
+    console.error('事务失败:', error);
+  }
+}
+```
+
+## ⚡ 六、响应式数据绑定（React 集成）
+
+Dexie.js 提供了 `dexie-react-hooks` 包，实现数据库状态与 React 组件状态的自动同步【turn0search2】。
+
+### 安装依赖
+
+```bash
+npm install dexie-react-hooks
+```
+
+### React 组件示例
+
+```jsx
+import React, { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from './database'; // 假设数据库配置在此文件
+
+function FriendManager() {
+  const [newFriend, setNewFriend] = useState({ name: '', age: '' });
+  
+  // 实时查询：数据变化时自动重新渲染
+  const friends = useLiveQuery(() => 
+    db.friends
+      .orderBy('name')
+      .toArray()
+  );
+  
+  // 添加朋友
+  const handleAddFriend = async () => {
+    if (!newFriend.name || !newFriend.age) return;
+    
+    try {
+      await db.friends.add({
+        name: newFriend.name,
+        age: parseInt(newFriend.age),
+        email: `${newFriend.name.toLowerCase()}@example.com`,
+        tags: []
+      });
+      setNewFriend({ name: '', age: '' });
+    } catch (error) {
+      console.error('添加失败:', error);
+    }
+  };
+  
+  // 删除朋友
+  const handleDeleteFriend = async (id) => {
+    try {
+      await db.friends.delete(id);
+    } catch (error) {
+      console.error('删除失败:', error);
+    }
+  };
+  
+  return (
+    <div>
+      <h2>朋友列表</h2>
+      
+      {/* 添加表单 */}
+      <div>
+        <input
+          type="text"
+          placeholder="姓名"
+          value={newFriend.name}
+          onChange={(e) => setNewFriend({...newFriend, name: e.target.value})}
+        />
+        <input
+          type="number"
+          placeholder="年龄"
+          value={newFriend.age}
+          onChange={(e) => setNewFriend({...newFriend, age: e.target.value})}
+        />
+        <button onClick={handleAddFriend}>添加</button>
+      </div>
+      
+      {/* 朋友列表 */}
+      <ul>
+        {friends?.map(friend => (
+          <li key={friend.id}>
+            <span>{friend.name} - {friend.age}岁</span>
+            <button onClick={() => handleDeleteFriend(friend.id)}>删除</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default FriendManager;
+```
+
+## 📊 七、数据库版本管理与迁移
+
+随着应用迭代，数据库结构可能需要变更，Dexie.js 提供了优雅的版本管理机制【turn0search0】。
+
+```javascript
+// 数据库版本升级示例
+db.version(2).stores({
+  // 修改 friends 表结构：添加 email 字段，创建复合索引
+  friends: '++id, name, age, email, *tags, [name+age]',
+  // 新增 notes 表
+  notes: '++id, content, createdAt, friendId'
+}).upgrade(tx => {
+  // 数据迁移逻辑：为现有朋友添加 email 字段
+  return tx.table('friends').toCollection().modify(friend => {
+    // 如果没有 email，则根据姓名生成
+    if (!friend.email) {
+      friend.email = `${friend.name.toLowerCase()}@example.com`;
+    }
+  });
+});
+
+// 版本 3：添加更多表和字段
+db.version(3).stores({
+  friends: '++id, name, age, email, *tags, [name+age], createdAt',
+  notes: '++id, content, createdAt, friendId, updatedAt',
+  settings: '++id, key, value'
+}).upgrade(tx => {
+  // 为所有朋友添加创建时间
+  return tx.table('friends').toCollection().modify(friend => {
+    friend.createdAt = new Date();
+  });
+});
+```
+
+## 🎯 八、最佳实践建议
+
+### 1. 错误处理
+
+```javascript
+// 全局错误处理
+db.on('error', error => {
+  console.error('数据库错误:', error);
+});
+
+// 操作级错误处理
+async function safeOperation() {
+  try {
+    await db.friends.add({ name: '王五' }); // 可能缺少必填字段
+  } catch (error) {
+    console.error('操作失败:', error);
+    // 可以在这里进行用户通知或回退操作
+  }
+}
+```
+
+### 2. 数据模型设计
+
+```typescript
+// 使用 TypeScript 定义数据模型
+interface Friend {
+  id?: number;
+  name: string;
+  age: number;
+  email: string;
+  tags?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// 扩展 Dexie 类以获得类型安全
+class FriendDatabase extends Dexie {
+  friends: Dexie.Table<Friend, number>;
+  
+  constructor() {
+    super('FriendDatabase');
+    this.version(1).stores({
+      friends: '++id, name, age, email, *tags'
+    });
+    this.friends = this.table('friends');
+  }
+}
+
+const db = new FriendDatabase();
+```
+
+### 3. 性能优化
+
+<details>
+<summary>🔧 性能优化技巧</summary>
+
+```javascript
+// 1. 使用批量操作代替循环单条操作
+const friendsToAdd = [/* 大量朋友数据 */];
+await db.friends.bulkAdd(friendsToAdd); // 性能优于循环调用 add
+
+// 2. 只查询需要的字段
+const friendNames = await db.friends
+  .where('age')
+  .above(20)
+  .keys(); // 只获取主键数组
+
+// 3. 使用索引覆盖查询
+const friendsWithEmail = await db.friends
+  .where('email')
+  .startsWith('admin')
+  .toArray();
+
+// 4. 避免在查询中删除或修改数据
+// 错误示例：
+await db.friends.where('age').above(30).delete(); // 这会导致索引重建
+// 正确示例：先查询再删除
+const oldFriends = await db.friends.where('age').above(30).toArray();
+await db.friends.bulkDelete(oldFriends.map(f => f.id));
+```
+
+</details>
+
+## 🚀 九、完整示例运行指南
+
+### 项目结构
+```
+dexie-example/
+├── src/
+│   ├── database.js        # 数据库配置
+│   ├── FriendManager.jsx  # React 组件
+│   └── App.jsx            # 主应用
+├── public/
+│   └── index.html
+├── package.json
+└── vite.config.js
+```
+
+### 完整代码
+
+<details>
+<summary>📁 database.js</summary>
+
+```javascript
+import Dexie from 'dexie';
+
+class FriendDatabase extends Dexie {
+  constructor() {
+    super('FriendDatabase');
+    
+    this.version(1).stores({
+      friends: '++id, name, age, email, *tags, [name+age]',
+      gameSessions: '++id, friendId, score, playedAt'
+    });
+    
+    this.friends = this.table('friends');
+    this.gameSessions = this.table('gameSessions');
+  }
+  
+  // 添加朋友
+  async addFriend(friend) {
+    return await this.friends.add({
+      ...friend,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+  
+  // 获取所有朋友
+  async getAllFriends() {
+    return await this.friends.orderBy('name').toArray();
+  }
+  
+  // 获取年轻朋友
+  async getYoungFriends() {
+    return await this.friends
+      .where('age')
+      .below(30)
+      .toArray();
+  }
+  
+  // 更新朋友信息
+  async updateFriend(id, updates) {
+    return await this.friends.update(id, {
+      ...updates,
+      updatedAt: new Date()
+    });
+  }
+  
+  // 删除朋友
+  async deleteFriend(id) {
+    return await this.friends.delete(id);
+  }
+}
+
+export const db = new FriendDatabase();
+```
+
+</details>
+
+<details>
+<summary>📁 FriendManager.jsx</summary>
+
+```jsx
+import React, { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from './database';
+
+function FriendManager() {
+  const [newFriend, setNewFriend] = useState({ name: '', age: '', email: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  
+  // 实时查询朋友数据
+  const friends = useLiveQuery(() => db.getAllFriends());
+  
+  // 添加朋友
+  const handleAddFriend = async () => {
+    if (!newFriend.name || !newFriend.age) return;
+    
+    try {
+      await db.addFriend({
+        name: newFriend.name,
+        age: parseInt(newFriend.age),
+        email: newFriend.email || `${newFriend.name.toLowerCase()}@example.com`,
+        tags: []
+      });
+      setNewFriend({ name: '', age: '', email: '' });
+    } catch (error) {
+      console.error('添加失败:', error);
+    }
+  };
+  
+  // 开始编辑
+  const handleEdit = (friend) => {
+    setEditingId(friend.id);
+    setEditForm({ ...friend });
+  };
+  
+  // 保存编辑
+  const handleSaveEdit = async () => {
+    try {
+      await db.updateFriend(editingId, editForm);
+      setEditingId(null);
+      setEditForm({});
+    } catch (error) {
+      console.error('更新失败:', error);
+    }
+  };
+  
+  // 取消编辑
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditForm({});
+  };
+  
+  // 删除朋友
+  const handleDeleteFriend = async (id) => {
+    if (window.confirm('确定要删除这个朋友吗？')) {
+      try {
+        await db.deleteFriend(id);
+      } catch (error) {
+        console.error('删除失败:', error);
+      }
+    }
+  };
+  
+  return (
+    <div>
+      <h2>朋友管理系统</h2>
+      
+      {/* 添加表单 */}
+      <div>
+        <h3>添加新朋友</h3>
+        <input
+          type="text"
+          placeholder="姓名"
+          value={newFriend.name}
+          onChange={(e) => setNewFriend({...newFriend, name: e.target.value})}
+        />
+        <input
+          type="number"
+          placeholder="年龄"
+          value={newFriend.age}
+          onChange={(e) => setNewFriend({...newFriend, age: e.target.value})}
+        />
+        <input
+          type="email"
+          placeholder="邮箱（可选）"
+          value={newFriend.email}
+          onChange={(e) => setNewFriend({...newFriend, email: e.target.value})}
+        />
+        <button onClick={handleAddFriend}>添加朋友</button>
+      </div>
+      
+      {/* 朋友列表 */}
+      <div>
+        <h3>朋友列表 ({friends?.length || 0} 位)</h3>
+        {friends?.map(friend => (
+          <div key={friend.id}>
+            {editingId === friend.id ? (
+              // 编辑模式
+              <div>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                />
+                <input
+                  type="number"
+                  value={editForm.age}
+                  onChange={(e) => setEditForm({...editForm, age: parseInt(e.target.value)})}
+                />
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                />
+                <button onClick={handleSaveEdit}>保存</button>
+                <button onClick={handleCancelEdit}>取消</button>
+              </div>
+            ) : (
+              // 查看模式
+              <div>
+                <span>{friend.name} - {friend.age}岁 - {friend.email}</span>
+                <button onClick={() => handleEdit(friend)}>编辑</button>
+                <button onClick={() => handleDeleteFriend(friend.id)}>删除</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default FriendManager;
+```
+
+</details>
+
+### 运行步骤
+
+1. **创建项目**
+```bash
+npm create vite@latest dexie-example -- --template react
+cd dexie-example
+npm install dexie dexie-react-hooks
+```
+
+2. **复制上述代码到相应文件**
+
+3. **启动开发服务器**
+```bash
+npm run dev
+```
+
+4. **在浏览器中打开** `http://localhost:5173`
+
+## 📈 十、总结与进阶
+
+这个完整示例展示了 Dexie.js 的核心用法：
+
+| 功能      | 实现方式                                 | 适用场景       |
+| --------- | ---------------------------------------- | -------------- |
+| 基础 CRUD | `add()`, `get()`, `update()`, `delete()` | 简单数据管理   |
+| 批量操作  | `bulkAdd()`, `bulkPut()`, `bulkDelete()` | 大数据量处理   |
+| 复杂查询  | `where()`, `between()`, `and()`          | 多条件筛选     |
+| 事务处理  | `transaction()`                          | 多表操作原子性 |
+| 响应式 UI | `useLiveQuery()`                         | 实时数据同步   |
+
+### 进阶学习方向
+
+1. **Dexie Cloud**：实现多设备数据同步【turn0search10】
+2. **Observable 插件**：监听数据变化【turn0search34】
+3. **与 Vue/Angular 集成**：不同框架的适配方案【turn0search3】
+4. **性能优化**：索引策略、查询优化【turn0search18】
+
+通过这个示例，您应该已经掌握了 Dexie.js 的核心用法。根据您的具体需求，可以在此基础上扩展更复杂的功能。
