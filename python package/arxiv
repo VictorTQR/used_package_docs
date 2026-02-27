@@ -1,0 +1,152 @@
+---
+language: Python
+url: https://pypi.org/project/arxiv/
+source: z.ai(glm-5)
+---
+
+# Arxiv Python 库完整 Demo
+
+`arxiv` 是一个非官方的 Python 封装库，用于方便地访问 arXiv API。它非常适合用于学术论文的搜索、元数据获取和 PDF 下载。
+
+以下是涵盖**安装、搜索、获取详细信息、下载 PDF**的完整 Demo。
+
+## 1. 安装库
+
+首先，你需要安装该库。打开终端运行：
+
+```bash
+# 使用 pip
+pip install arxiv
+# 使用 uv
+uv add arxiv
+```
+
+## 2. 完整代码示例
+
+这个脚本演示了如何搜索最近关于 "LLM" (大语言模型) 的论文，打印信息，并下载第一篇论文的 PDF。
+
+```python
+import arxiv
+import os
+
+def main():
+    # ---------------------------------------------------------
+    # 1. 构造搜索对象
+    # ---------------------------------------------------------
+    print("正在搜索 arXiv...")
+    search = arxiv.Search(
+        query="LLM",                 # 搜索关键词
+        max_results=5,               # 限制返回结果数量
+        sort_by=arxiv.SortCriterion.SubmittedDate, # 按提交日期排序
+        sort_order=arxiv.SortOrder.Descending      # 降序（最新的在前）
+    )
+
+    # ---------------------------------------------------------
+    # 2. 遍历搜索结果
+    # ---------------------------------------------------------
+    # search.results() 是一个生成器，会执行网络请求
+    results = list(search.results())
+    
+    print(f"找到 {len(results)} 篇论文：\n")
+
+    for i, paper in enumerate(results):
+        print(f"--- 论文 {i+1} ---")
+        print(f"标题       : {paper.title}")
+        print(f"作者       : {', '.join([a.name for a in paper.authors])}")
+        print(f"发布日期   : {paper.published.strftime('%Y-%m-%d')}")
+        print(f"摘要       : {paper.summary[:100]}...") # 只打印前100字符
+        print(f"PDF链接    : {paper.pdf_url}")
+        print(f"arXiv ID   : {paper.entry_id}")
+        print()
+
+    # ---------------------------------------------------------
+    # 3. 下载 PDF (演示：下载第一篇论文)
+    # ---------------------------------------------------------
+    if results:
+        paper_to_download = results[0]
+        save_dir = "./arxiv_papers"
+        
+        # 创建保存目录
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        print(f"正在下载论文: {paper_to_download.title}")
+        
+        # 下载函数
+        # filename_fn 可以自定义文件名，默认使用论文标题
+        paper_to_download.download_pdf(
+            dirpath=save_dir,
+            filename=f"{paper_to_download.get_short_id()}.pdf"
+        )
+        print(f"下载完成！文件保存在: {save_dir}/{paper_to_download.get_short_id()}.pdf")
+
+    # ---------------------------------------------------------
+    # 4. 通过 ID 直接获取论文 (不需要搜索)
+    # ---------------------------------------------------------
+    # 如果你已知 arXiv ID，例如 "2303.08774" (Llama 2 论文)
+    print("\n通过 ID 直接获取论文演示...")
+    paper_id = "2303.08774"
+    
+    try:
+        paper = next(arxiv.Search(id_list=[paper_id]).results())
+        print(f"获取成功: {paper.title}")
+    except StopIteration:
+        print("未找到该 ID 的论文。")
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## 3. 核心功能详解
+
+### A. 搜索参数
+
+`arxiv.Search` 支持多种参数控制搜索行为：
+
+*   `query`: 搜索关键词。支持 arXiv 的标准查询语法（如 `ti:attention` 搜索标题，`au:LeCun` 搜索作者）。
+*   `max_results`: 最大返回数量。
+*   `sort_by`: 排序依据。
+    *   `arxiv.SortCriterion.Relevance` (相关度)
+    *   `arxiv.SortCriterion.LastUpdatedDate` (最后更新时间)
+    *   `arxiv.SortCriterion.SubmittedDate` (提交时间)
+*   `id_list`: 如果你有一组已知 ID，可以传入列表直接获取，忽略 query。
+
+### B. Result 对象属性
+
+每个 `result` 对象包含以下常用属性：
+
+| 属性               | 说明                                                |
+| :----------------- | :-------------------------------------------------- |
+| `title`            | 论文标题                                            |
+| `authors`          | 作者列表 (对象列表，需 `.name` 获取名字)            |
+| `summary`          | 摘要文本                                            |
+| `published`        | 发布时间                                            |
+| `updated`          | 更新时间                                            |
+| `pdf_url`          | PDF 下载链接                                        |
+| `entry_id`         | arXiv ID (URL 形式，如 `http://arxiv.org/abs/xxxx`) |
+| `primary_category` | 主分类 (如 `cs.AI`)                                 |
+| `categories`       | 所有分类标签                                        |
+| `links`            | 相关链接列表                                        |
+
+### C. 高级用法：自定义客户端
+
+如果你需要设置请求超时、重试次数或代理，可以使用 `arxiv.Client`：
+
+```python
+client = arxiv.Client(
+    page_size=10,      # 每页请求大小
+    delay_seconds=3,   # 请求间隔 (arXiv 建议每3秒请求一次，避免被封)
+    num_retries=5      # 重试次数
+)
+
+search = arxiv.Search(query="machine learning")
+# 使用 client 的方法获取结果
+results = client.results(search)
+```
+
+## 4. 常见问题
+
+*   **中文乱码问题**：如果下载的 PDF 文件名包含中文，在某些系统上可能会乱码，建议使用 `paper.get_short_id()` (即 arXiv ID) 作为文件名，如示例代码所示。
+*   **API 限制**：arXiv 官方 API 有速率限制。如果你在短时间内发起大量请求，可能会被暂时封禁 IP。使用 `Client` 并设置合理的 `delay_seconds` 是个好习惯。
